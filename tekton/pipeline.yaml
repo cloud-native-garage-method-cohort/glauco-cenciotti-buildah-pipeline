@@ -1,0 +1,68 @@
+# pipeline.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  annotations:
+    app.openshift.io/runtime: nodejs
+  name: buildah-pipeline
+spec:
+  params:
+    - name: source-repo
+      type: string
+      description: Source repository name
+      default: https://github.com/account-name/repo-name
+    - name: image-repo
+      type: string
+      description: Docker image name
+      default: quay.io/account-name/repo-name
+  workspaces:
+    - name: buildah-shared-data
+      description: |
+        This workspace stores the cloned repository and is available to all steps
+  tasks:
+    - name: clone-repository
+      params:
+        - name: url
+          value: "$(params.source-repo)"
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: buildah-shared-data
+    - name: install-dependencies
+      runAfter:
+        - clone-repository
+      taskRef:
+        name: npm
+      workspaces:
+        - name: source
+          workspace: buildah-shared-data
+      params:
+        - name: ARGS
+          value:
+            - clean-install
+    - name: run-tests
+      runAfter:
+        - install-dependencies
+      taskRef:
+        name: npm
+      workspaces:
+        - name: source
+          workspace: buildah-shared-data
+      params:
+        - name: ARGS
+          value:
+            - test
+    - name: build-image
+      runAfter:
+        - run-tests
+      params:
+        - name: IMAGE
+          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      workspaces:
+        - name: source
+          workspace: buildah-shared-data
