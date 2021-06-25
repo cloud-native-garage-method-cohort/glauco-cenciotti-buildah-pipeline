@@ -66,3 +66,19 @@ spec:
       workspaces:
         - name: source
           workspace: buildah-shared-data
+    - name: kustomize-build
+      runAfter:
+        - build-image
+      params:
+        - name: app-namespace
+          value: glauco-cenciotti-pfs
+        - name: app-name
+          value: buildah-pipeline-app
+        - name: image-with-tag
+          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"
+      taskRef:
+        kind: Task
+        name: kustomize-buildah-pipeline
+      workspaces:
+        - name: source
+          workspace: buildah-shared-data

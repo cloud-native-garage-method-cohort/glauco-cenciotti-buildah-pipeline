@@ -1,0 +1,66 @@
+# vcs-trigger.yaml
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: vcs-trigger-template-buildah
+spec:
+  resourcetemplates:
+    apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: buildah-pipeline-run-
+    spec:
+      pipelineRef:
+        name: buildah-pipeline
+      serviceAccountName: build-bot
+      params:
+        - name: source-repo
+          value: https://github.com/cloud-native-garage-method-cohort/glauco-cenciotti-buildah-pipeline
+        - name: image-repo
+          value: quay.io/glauco74/buildah-pipeline
+      workspaces:
+        - name: buildah-shared-data
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: vcs-trigger-binding-buildah
+spec:
+  params:
+    - name: namespace
+      value: glauco-cenciotti-pfs
+    - name: gitrepositoryurl
+      value: $(body.repository.url)
+    - name: gitrepositoryname
+      value: $(body.repository.name)
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: vcs-trigger-buildah-el
+spec:
+  serviceAccountName: vcs-trigger
+  triggers:
+    - bindings:
+        - ref: vcs-trigger-binding-buildah
+      template:
+        name: vcs-trigger-template-buildah
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vcs-trigger-buildah-el-route
+spec:
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: vcs-trigger-buildah-el
+    weight: 100
